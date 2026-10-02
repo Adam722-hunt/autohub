@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\AdminSetting;
+use App\Notifications\NewUserRegistrationNotification;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -27,9 +29,18 @@ class AuthController extends Controller
             'phone' => $userData['phone'],
             'password' => Hash::make($userData['password']),
         ]);
-
+        $user->preference()->create([
+            'currency_id' => 28
+        ]);
+        $user->notificationSettings()->create();
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        if (AdminSetting::where('key', 'notify_new_user_registration')->value('value') == 'true') {
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new NewUserRegistrationNotification($user));
+            }
+        }
         return response()->json([
             'message' => 'User registered successfully',
             'user' => $user,
@@ -50,6 +61,11 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Invalid email or password'
             ], 401);
+        }
+        if ($user->status !== 'active') {
+            return response()->json([
+                'message' => 'Your account has been blocked.'
+            ], 403);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;

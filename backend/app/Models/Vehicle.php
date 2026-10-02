@@ -23,6 +23,8 @@ use App\Models\City;
 use App\Models\VehicleImage;
 use App\Models\Feature;
 use App\Models\Report;
+use App\Models\VehicleView;
+use App\Models\Conversation;
 
 class Vehicle extends EloquenModel
 {
@@ -71,6 +73,7 @@ class Vehicle extends EloquenModel
 
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
+
         ];
     }
 
@@ -182,5 +185,13 @@ class Vehicle extends EloquenModel
     public function favoritedByUsers()
     {
         return $this->belongsToMany(User::class, 'favorites');
+    }
+
+    public function vehicleViews(){
+        return $this->hasMany(VehicleView::class);
+    }
+
+    public function conversations(){
+        return $this->hasMany(Conversation::class);
     }
 }

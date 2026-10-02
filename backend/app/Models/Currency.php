@@ -13,4 +13,8 @@ class Currency extends Model
     public function vehicles(){
         return $this->hasMany(Vehicle::class);
     }
+
+    public function preferences(){
+        return $this->hasMany(UserPreference::class);
+    }
 }

@@ -13,7 +13,7 @@ class EngineCyl extends Model
     ];
 
       public function vehicles(){
-        return $this->hasMany(Vehicle::class);
+        return $this->hasMany(Vehicle::class,'engine_cylinder_id');
     }
     
 }

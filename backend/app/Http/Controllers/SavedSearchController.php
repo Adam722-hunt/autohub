@@ -26,9 +26,13 @@ class SavedSearchController extends Controller
 
 
     public function index(Request $request){
+
+        $user_saved_searches=$request->user()->savedSearches()->count();
+
         $searches=$request->user()->savedSearches()->orderBy('created_at','desc')->get();
 
         return response()->json([
+            'quantity'=>$user_saved_searches,
             'searches'=>$searches,
         ]);
     }
@@ -49,4 +53,6 @@ class SavedSearchController extends Controller
         ]);
 
     }
+
+    
 }

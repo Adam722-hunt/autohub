@@ -15,6 +15,8 @@ use App\Models\Country;
 use App\Models\City;
 use App\Models\SavedSearch;
 use App\Models\Review;
+use App\Models\VehicleView;
+use App\Models\UserNotificationSetting;
 
 use Laravel\Sanctum\HasApiTokens;
 
@@ -39,6 +41,12 @@ class User extends Authenticatable
         'city_id',
         'avatar',
         'bio',
+        'role',
+        'status',
+        'cover_image',
+        'show_phone',
+        'blocked_at',
+        'verified',
     ];
 
     /**
@@ -61,6 +69,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'verified'=>'boolean',
         ];
     }
 
@@ -100,7 +109,7 @@ class User extends Authenticatable
 
     public function favoriteVehicles()
     {
-        return $this->belongsToMany(Vehicle::class, 'favorites');
+        return $this->belongsToMany(Vehicle::class, 'favorites')->withTimestamps();
     }
 
     public function savedSearches()
@@ -117,4 +126,24 @@ class User extends Authenticatable
     {
         return $this->hasMany(Review::class, 'reviewed_user_id');
     }
+
+    public function views()
+    {
+        return $this->hasMany(VehicleView::class);
+    }
+
+    public function vehicleViews(){
+        
+        return $this->hasManyThrough(VehicleView::class,Vehicle::class);
+    }
+
+    public function preference(){
+
+        return $this->hasOne(UserPreference::class);
+
+    }
+    public function notificationSettings()
+{
+    return $this->hasOne(UserNotificationSetting::class);
+}
 }

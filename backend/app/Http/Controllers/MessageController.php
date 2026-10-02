@@ -1,17 +1,25 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Http\Resources\MessageResource;
 use App\Http\Requests\StoreMessageRequest;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Vehicle;
+use App\Models\AdminSetting;
 use Illuminate\Http\Request;
+use App\Notifications\NewMessageNotification;
 
 class MessageController extends Controller
 {
     public function store(Vehicle $vehicle, StoreMessageRequest $request)
     {
+        if (AdminSetting::where('key', 'enable_messaging')->value('value') != 'true') {
+            return response()->json([
+                'message' => 'Messaging is currently disabled'
+            ], 403);
+        }
 
         if ($request->user()->id === $vehicle->user_id) {
             return response()->json([
@@ -46,12 +54,15 @@ class MessageController extends Controller
             'conversation' => $converation,
             'data' => $message
         ], 201);
-
-
     }
 
     public function send(Conversation $conversation, StoreMessageRequest $request)
     {
+        if (AdminSetting::where('key', 'enable_messaging')->value('value') != 'true') {
+            return response()->json([
+                'message' => 'Messaging is currently disabled'
+            ], 403);
+        }
         if (
             $conversation->buyer_id !== $request->user()->id &&
             $conversation->seller_id !== $request->user()->id
@@ -73,14 +84,26 @@ class MessageController extends Controller
             'sender_id' => $request->user()->id,
             'message' => $validated['message']
         ]);
+        $recipient = $conversation->buyer_id === $request->user()->id
+            ? $conversation->seller
+            : $conversation->buyer;
+        if ($recipient->notificationSettings->messages) {
+            $recipient->notify(new NewMessageNotification($message));
+        }
 
         return response()->json([
             'message' => 'sent',
             'data' => new MessageResource($message)
         ], 201);
     }
+
     public function update(Conversation $conversation, Message $message, StoreMessageRequest $request)
     {
+        if (AdminSetting::where('key', 'enable_messaging')->value('value') != 'true') {
+            return response()->json([
+                'message' => 'Messaging is currently disabled'
+            ], 403);
+        }
         if (
             ($conversation->buyer_id === $request->user()->id && $conversation->buyer_deleted_at !== null) ||
             ($conversation->seller_id === $request->user()->id && $conversation->seller_deleted_at !== null)
@@ -125,11 +148,15 @@ class MessageController extends Controller
             'message' => 'Message updated',
             'updated_message' => new MessageResource($message)
         ]);
-
     }
 
     public function destroy(Conversation $conversation, Message $message, Request $request)
     {
+        if (AdminSetting::where('key', 'enable_messaging')->value('value') != 'true') {
+            return response()->json([
+                'message' => 'Messaging is currently disabled'
+            ], 403);
+        }
         if (
             $conversation->buyer_id !== $request->user()->id &&
             $conversation->seller_id !== $request->user()->id

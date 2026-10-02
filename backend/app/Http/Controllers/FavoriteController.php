@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Vehicle;
+use App\Notifications\NewFavoriteNotification;
+
 class FavoriteController extends Controller
 {
     public function store(Vehicle $vehicle, Request $request)
@@ -21,9 +23,11 @@ class FavoriteController extends Controller
 
         $request->user()->favoriteVehicles()->syncWithoutDetaching($vehicle);
 
+        if ($vehicle->user->notificationSettings->favorites) {
+            $vehicle->user->notify(new NewFavoriteNotification($vehicle, $request->user()));
+        }
         return response()->json([
             'message' => 'Vehicle favorited successfully',
-            'vehicle' => $vehicle,
         ], 201);
     }
 
@@ -44,23 +48,40 @@ class FavoriteController extends Controller
 
     public function index(Request $request)
     {
+        $user_favs = $request->user()->favoriteVehicles()->count();
+
         $favData = $request->user()->favoriteVehicles()->when(
-            $request->filled('sort'),function($query) use ($request){
-                switch($request->sort){
+            $request->filled('sort'),
+            function ($query) use ($request) {
+                switch ($request->sort) {
                     case 'newest':
-                        $query->orderby('created_at','desc');
+                        $query->orderby('favorites.created_at', 'desc');
                         break;
-                    case 'low_price' : 
-                        $query->orderBy('price','asc');
+                    case 'oldest':
+                        $query->orderBy('favorites.created_at', 'asc');
                         break;
-                    case 'high_price' : 
-                        $query->orderBy('price','desc');
+                    case 'low_price':
+                        $query->orderBy('price', 'asc');
+                        break;
+                    case 'high_price':
+                        $query->orderBy('price', 'desc');
                         break;
                 }
-            })->get();
+            }
+        )->select(
+            'id',
+            'title',
+            'price',
+            'mileage',
+            'fuel_type_id',
+            'user_id',
+            'country_id',
+            'city_id'
+        )->with(['primaryImage', 'fuelType:id,name', 'user:id,username', 'country:id,name', 'city:id,name'])->get();
 
         return response()->json([
-            'vehicles' => $favData
+            'vehicles' => $favData,
+            'quantity' => $user_favs
         ], 200);
     }
 }

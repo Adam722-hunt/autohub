@@ -3,10 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
+use App\Models\AdminSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
+use App\Http\Resources\VehicleResource;
+use Illuminate\Support\Str;
+use App\Http\Controllers\AdminController;
+use App\Models\User;
+use App\Notifications\NewListingCreatedNotification;
+
 class VehicleController extends Controller
 {
     public function index(Request $request)
@@ -21,8 +28,7 @@ class VehicleController extends Controller
         }
         if ($request->filled('vehicle_type_id')) {
             $query->where('vehicle_type_id', $request->vehicle_type_id);
-        }
-        ;
+        };
         if ($request->filled('body_type_id')) {
             $query->where('body_type_id', $request->body_type_id);
         }
@@ -102,7 +108,6 @@ class VehicleController extends Controller
                     $query->orderBy('mileage', 'asc');
 
                     break;
-
             }
         }
         if ($request->filled('search')) {
@@ -148,38 +153,70 @@ class VehicleController extends Controller
             });
         }
 
-        $vehicles = $query->with([
+        $vehicles = $query->select(
+            [
+                'id',
+                'title',
+                'brand_id',
+                'mileage',
+                'year',
+                'price',
+                'currency_id',
+                'country_id',
+                'city_id',
+                'fuel_type_id',
+                'transmission_id'
+            ]
+        )->with([
 
-            'brand',
-            'model',
-            'vehicleType',
-            'fuelType',
-            'transmissionType',
-            'city',
-            'currency',
-            'primaryImage',
+            'brand:id,name',
+            'fuelType:id,name',
+            'transmissionType:id,name',
+            'city:id,name',
+            'country:id,name',
+            'currency:id,symbol',
+            'primaryImage:id,image',
 
         ])->paginate(20);
 
-        $matchingVehicles=$vehicles->total();
-        $totalVehicles=Vehicle::where('status','active')->count();
+        $matchingVehicles = $vehicles->total();
+        $totalVehicles = Vehicle::where('status', 'active')->count();
 
         return response()->json([
             'vehicles' => $vehicles,
-            'matchingVehicles'=>$matchingVehicles,
-            'totalVehicles'=>$totalVehicles
+            'matchingVehicles' => $matchingVehicles,
+            'totalVehicles' => $totalVehicles
         ], 200);
     }
 
-    public function show(Vehicle $vehicle)
+    public function show(Vehicle $vehicle, Request $request)
     {
+        $visitor_token = $request->cookie('visitor_token');
         if ($vehicle->status !== 'active') {
             return response()->json([
                 'message' => 'Vehicle not found',
             ], 404);
         }
+        if (auth('sanctum')->check()) {
+
+            if (!$vehicle->vehicleViews()->where('user_id', auth('sanctum')->id())->exists()) {
+                $vehicle->vehicleViews()->create([
+                    'user_id' => auth('sanctum')->id()
+                ]);
+            }
+        } else {
+            if (!$visitor_token) {
+                $visitor_token = (string) Str::uuid();
+            }
+            if (!$vehicle->vehicleViews()->where('visitor_id', $visitor_token)->exists()) {
+                $vehicle->vehicleViews()->create([
+                    'visitor_id' => $visitor_token
+                ]);
+            }
+        }
 
         $vehicle->load([
+            'user',
             'brand',
             'model',
             'vehicleType',
@@ -198,11 +235,16 @@ class VehicleController extends Controller
             'city',
             'images',
             'features',
+            'vehicleViews'
         ]);
-
-        return response()->json([
-            'vehicle' => $vehicle
+        $response = response()->json([
+            'vehicle' =>    new VehicleResource($vehicle)
         ]);
+        if (auth('sanctum')->check()) {
+            return $response;
+        }
+        $response->cookie('visitor_token', $visitor_token);
+        return $response;
     }
 
     public function store(StoreVehicleRequest $request)
@@ -212,6 +254,19 @@ class VehicleController extends Controller
         $vehicleData['user_id'] = $request->user()->id;
 
         $vehicle = Vehicle::create($vehicleData);
+
+        if (AdminSetting::where('key', 'notify_new_listing_created')->value('value') == 'true') {
+            $admins = User::where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new NewListingCreatedNotification($vehicle));
+            }
+        }
+
+        if (AdminSetting::where('key', 'auto_approve_listings')->value('value') == 'true' && $request->user()->verified === true) {
+            $vehicle->update([
+                'status' => 'active'
+            ]);
+        }
 
         return response()->json([
             'message' => 'vehicle added successfully!',

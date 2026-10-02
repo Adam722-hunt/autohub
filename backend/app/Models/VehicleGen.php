@@ -14,11 +14,11 @@ class VehicleGen extends Model
     ];
 
     public function vehicles(){
-        return $this->hasMany(Vehicle::class);
+        return $this->hasMany(Vehicle::class,'vehicle_generation_id');
     }
 
     public function vehicleModel(){
-        return $this->belongsTo(VehicleModel::class);
+        return $this->belongsTo(VehicleModel::class,'model_id');
     }
 
 }

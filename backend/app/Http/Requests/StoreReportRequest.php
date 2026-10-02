@@ -17,7 +17,7 @@ class StoreReportRequest extends FormRequest
     return [
         'reason' => 'required|in:fraud,incorrect_information,inappropriate_content,duplicate_listing,vehicle_not_available,other',
         'reason_description' => 'required_if:reason,other|nullable|string',
-        'evidence' => 'nullable|file',
+        'evidence' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
     ];
 }
 }

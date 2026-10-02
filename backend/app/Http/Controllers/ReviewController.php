@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Requests\UpdateReviewRequest;
+use App\Notifications\NewReviewNotification;
 
 class ReviewController extends Controller
 {
@@ -32,6 +33,10 @@ class ReviewController extends Controller
             'rating' => $reviewData['rating'],
             'comment' => $reviewData['comment'] ?? null,
         ]);
+        if ($user->notificationSettings->reviews) {
+
+            $user->notify(new NewReviewNotification($review));
+        }
 
         return response()->json([
             'message' => 'You have successfully reviewed this seller',
@@ -88,7 +93,6 @@ class ReviewController extends Controller
             'message' => 'Review updated successfully',
             'review' => $review->refresh(),
         ]);
-
     }
 
     public function destroy(Request $request, Review $review)

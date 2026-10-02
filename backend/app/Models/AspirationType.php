@@ -12,6 +12,6 @@ class AspirationType extends Model
     ];
 
     public function vehicles(){
-        return $this->hasMany(Vehicle::class);
+        return $this->hasMany(Vehicle::class,'aspiration_id');
     }
 }

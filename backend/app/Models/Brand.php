@@ -7,21 +7,27 @@ use Illuminate\Database\Eloquent\Model as EloquentModel;
 use App\Models\VehicleModel;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
+
 class Brand extends EloquentModel
 {
-    protected $fillable=[
-        'name','vehicle_type_id'
+    protected $fillable = [
+        'name',
+        'vehicle_type_id',
+        'logo'
     ];
 
-    public function vehicleModels(){
+    public function vehicleModels()
+    {
         return $this->hasMany(VehicleModel::class);
     }
 
-    public function vehicles (){
+    public function vehicles()
+    {
         return $this->hasMany(Vehicle::class);
     }
 
-    public function vehicleType(){
+    public function vehicleType()
+    {
         return $this->belongsTo(VehicleTYpe::class);
     }
 }

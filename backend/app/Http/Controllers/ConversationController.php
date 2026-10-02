@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Http\Resources\ConversationResource;
 use App\Models\Conversation;
 use App\Models\Vehicle;
@@ -11,17 +12,33 @@ class ConversationController extends Controller
     public function index(Request $request)
     {
 
-        $conversations = Conversation::where('seller_id', $request->user()->id)->whereNull('seller_deleted_at')
-            ->orWhere('buyer_id', $request->user()->id)->whereNull('buyer_deleted_at')->with('latestMessage')->withMax('messages', 'created_at')->withCount([
-                    'messages as unread_messages_count' => function ($query) use ($request) {
-                        $query->whereNull('read_at')->where('sender_id', '!=', $request->user()->id);
-                    }
-                ])->orderByRaw('messages_max_created_at DESC NULLS last')->get();
+        $conversations = Conversation::where(function ($query) use ($request) {
+            $query->where('seller_id', $request->user()->id)->whereNull('seller_deleted_at')
+                ->orWhere('buyer_id', $request->user()->id)->whereNull('buyer_deleted_at');
+        })->with(['latestMessage', 'vehicle:id,title', 'seller:id,username,avatar', 'buyer:id,username,avatar'])->withMax('messages', 'created_at')->withCount([
+            'messages as unread_messages_count' => function ($query) use ($request) {
+                $query->whereNull('read_at')->where('sender_id', '!=', $request->user()->id);
+            }
+        ])->orderByRaw('messages_max_created_at DESC NULLS last');
+
+        if ($request->filled('search')) {
+            $conversations->where(function ($query) use ($request) {
+                $query->whereHas('vehicle', function ($query) use ($request) {
+                    $query->where('title', 'ILIKE', '%' . $request->search . '%');
+                });
+                $query->orWhereHas('seller', function ($query) use ($request) {
+                    $query->where('username', 'ILIKE', '%' . $request->search . '%');
+                });
+                $query->orWhereHas('buyer', function ($query) use ($request) {
+                    $query->where('username', 'ILIKE', '%' . $request->search . '%');
+                });
+            });
+        }
+        $conversations = $conversations->get();
 
         return response()->json([
             'conversations' => ConversationResource::collection($conversations)
         ]);
-
     }
 
     public function show(Request $request, Conversation $conversation)
@@ -44,11 +61,22 @@ class ConversationController extends Controller
 
         $my_conversation = $conversation->load([
             'messages' => function ($query) {
+                $query->select([
+                    'id',
+                    'conversation_id',
+                    'message',
+                    'sender_id',
+                    'created_at',
+                    'read_at',
+                    'deleted_at',
+                    'updated_at'
+                ]);
+
                 $query->orderBy('created_at', 'asc');
             },
-            'vehicle',
-            'seller',
-            'buyer'
+            'vehicle:id,title,price',
+            'seller:id,avatar,username',
+            'buyer:id,avatar,username',
         ]);
 
         return response()->json([
